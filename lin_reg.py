@@ -7,13 +7,17 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.model_selection import StratifiedKFold, GridSearchCV
-from sklearn.metrics import matthews_corrcoef, accuracy_score, make_scorer, log_loss, confusion_matrix
+from sklearn.metrics import matthews_corrcoef, accuracy_score
+from torch.utils.tensorboard import SummaryWriter
+from sklearn.metrics import r2_score
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy
 import seaborn as sns
 from collections import Counter
 import pickle
+
+writer = SummaryWriter('logs/protpred1')
 
 
 class Lin_reg(nn.Module):  # model class
@@ -78,6 +82,7 @@ def training(dataset, keys, model, h_params):  # training with cross validation
             running_loss += loss.item()
 
         losses_train.append(running_loss / len(train_loader))
+        writer.add_scalar('Training loss', running_loss / len(train_loader), epoch)
 
         model.eval()
         val_loss = 0.0
@@ -93,6 +98,7 @@ def training(dataset, keys, model, h_params):  # training with cross validation
 
         # remember validation scores
         losses_val.append(running_loss / len(val_loader))
+        writer.add_scalar('Validation loss', running_loss / len(val_loader), epoch)
 
         avg_val_loss = val_loss / len(val_loader)
 
@@ -111,6 +117,38 @@ def training(dataset, keys, model, h_params):  # training with cross validation
 
     print(f"Best validation loss: {best_val_loss}")
     return best_model, losses_train, losses_val
+
+
+def predict(dataset, keys, model):
+    batch_size = 32
+
+    test_loader = Dataloader(dataset, keys, batch_size=batch_size, shuffle=False)
+    model.eval()
+    predictions = []
+    truths = []
+    with torch.no_grad():
+        for inputs, targets in tqdm.tqdm(test_loader, maxinterval=len(test_loader)):
+            inputs = inputs.to(model.device)
+            outputs = model(inputs)
+            predictions.append(outputs)
+            truths.append(targets)
+
+    return predictions, truths
+
+
+def evaluate(true, predicted):
+    # flatten the lists
+    true = torch.cat(true)
+    true = true.view(-1)
+    true = true.to('cpu')
+    # convert to numpy
+    true = true.numpy()
+    predicted = torch.cat(predicted)
+    predicted = predicted.numpy()
+    pearson = scipy.stats.pearsonr(true, predicted)
+    r2_scor = r2_score(true, predicted)
+    mse = np.mean((true - predicted) ** 2)
+    return r2_scor, pearson, mse
 
 
 # needs to be adjusted for other scores
