@@ -58,16 +58,23 @@ class Dataloader():
             labels = torch.cat(labels)
             return embeddings, labels
 
+        batches = []
         if self.shuffle:
             index_iterator = iter(np.random.permutation(self.keys))
         else:
             index_iterator = iter(self.keys)
         batch = []
+
         for index in index_iterator:
             batch.append(self.dataset[index])
             if len(batch) == self.batch_size:
+                batches.append(batch)
                 yield return_data(batch)
                 batch = []
+            # if there are any remaining samples
+        if len(batch) > 0:
+            batches.append(batch)
+            yield return_data(batch)
 
     def __len__(self):
-        return len(self.keys) // self.batch_size
+        return (len(self.keys) + self.batch_size - 1) // self.batch_size

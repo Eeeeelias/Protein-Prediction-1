@@ -4,9 +4,6 @@ import torch
 import torch.nn as nn
 from sklearn.metrics import matthews_corrcoef, accuracy_score
 from sklearn.metrics import r2_score
-from torch.utils.tensorboard import SummaryWriter
-
-writer = SummaryWriter('logs/protpred1')
 
 
 class Lin_reg(nn.Module):  # model class
