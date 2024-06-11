@@ -1,21 +1,10 @@
-import torch.nn.functional as F
-import tqdm
-
-from dataload import Dataloader
-import scanpy as sc
-import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader, TensorDataset
-from sklearn.model_selection import StratifiedKFold, GridSearchCV
-from sklearn.metrics import matthews_corrcoef, accuracy_score
-from torch.utils.tensorboard import SummaryWriter
-from sklearn.metrics import r2_score
-import matplotlib.pyplot as plt
 import numpy as np
 import scipy
-import seaborn as sns
-from collections import Counter
-import pickle
+import torch
+import torch.nn as nn
+from sklearn.metrics import matthews_corrcoef, accuracy_score
+from sklearn.metrics import r2_score
+from torch.utils.tensorboard import SummaryWriter
 
 writer = SummaryWriter('logs/protpred1')
 
@@ -33,107 +22,6 @@ class Lin_reg(nn.Module):  # model class
     def forward(self, x):
         x = self.model(x)
         return x
-
-
-def save_to_file(model, file_name, grid=False):  # function for saving model
-    if grid:
-        with open(file_name, 'wb') as f:
-            pickle.dump(model, f)
-    else:
-        torch.save(model.state_dict(), file_name)
-
-
-def training(dataset, keys, model, h_params):  # training with cross validation
-
-    batch_size = h_params['batch_size']
-    epochs = h_params['epochs']
-    best_model = None
-    best_val_loss = float('inf')
-
-    losses_train = []
-    losses_val = []
-    print('starting cross validation')
-
-    train_keys, val_keys = keys[0], keys[1]
-
-    train_loader = Dataloader(dataset, train_keys, batch_size=batch_size, shuffle=True)
-    val_loader = Dataloader(dataset, val_keys, batch_size=batch_size, shuffle=True)
-
-    optimizer = torch.optim.SGD(model.parameters(), lr=model.hparams['lr'])
-    # optimizer = torch.optim.Adam(model.parameters(), lr=model.hparams['lr'])
-    criterion = nn.MSELoss()
-
-    for epoch in range(epochs):
-        print(f"Epoch {epoch + 1}")
-        model.train()  # training model
-        running_loss = 0.0
-
-        for inputs, targets in tqdm.tqdm(train_loader, maxinterval=len(train_loader)):
-            # send data to device
-            inputs, targets = inputs.to(model.device), targets.to(model.device)
-            optimizer.zero_grad()
-            outputs = model(inputs)
-            outputs = outputs.view(-1)
-            loss = criterion(outputs, targets)
-
-            loss.backward()
-            optimizer.step()
-
-            running_loss += loss.item()
-
-        losses_train.append(running_loss / len(train_loader))
-        writer.add_scalar('Training loss', running_loss / len(train_loader), epoch)
-
-        model.eval()
-        val_loss = 0.0
-        with torch.no_grad():
-            running_loss = 0.0
-            for inputs, targets in val_loader:
-                inputs, targets = inputs.to(model.device), targets.to(model.device)
-                outputs = model(inputs)
-                outputs = outputs.view(-1)
-                val_loss += criterion(outputs, targets).item()
-
-                running_loss += loss.item()
-
-        # remember validation scores
-        losses_val.append(running_loss / len(val_loader))
-        writer.add_scalar('Validation loss', running_loss / len(val_loader), epoch)
-
-        avg_val_loss = val_loss / len(val_loader)
-
-        #early_stopping = EarlyStopping(patience=5, verbose=True)
-
-        '''
-        early_stopping(avg_val_loss)
-        if early_stopping.should_stop():
-            print("Early stopping triggered.")
-        break
-        '''
-
-        if avg_val_loss < best_val_loss:
-            best_val_loss = avg_val_loss
-            best_model = model
-
-    print(f"Best validation loss: {best_val_loss}")
-    return best_model, losses_train, losses_val
-
-
-def predict(dataset, keys, model):
-    batch_size = 32
-
-    test_loader = Dataloader(dataset, keys, batch_size=batch_size, shuffle=False)
-    model.eval()
-    predictions = []
-    truths = []
-    with torch.no_grad():
-        for inputs, targets in tqdm.tqdm(test_loader, maxinterval=len(test_loader)):
-            inputs = inputs.to(model.device)
-            outputs = model(inputs)
-            predictions.append(outputs)
-            truths.append(targets)
-
-    return predictions, truths
 
 
 def evaluate(true, predicted):

@@ -19,10 +19,12 @@ import pickle
 class dense_Dataset:  # dataset class
     def __init__(self, path_to_embed, path_to_dense, test_perc=.15, val_perc=.15):
         self.dense = self.make_dataset(path_to_dense)
-        self.keys = list(self.dense.keys())
+        self.embed_file = h5py.File(path_to_embed, 'r')
+        # get keys of embed_file
+        self.embed_keys = list(self.embed_file.keys())
+        self.keys = list(set(self.embed_keys) & set(self.dense.keys()))
         self.train_keys, self.test_keys = train_test_split(self.keys, test_size=test_perc, random_state=42)
         self.train_keys, self.val_keys = train_test_split(self.train_keys, test_size=val_perc, random_state=0)
-        self.embed_file = h5py.File(path_to_embed, 'r')
 
     @staticmethod
     def make_dataset(path_to_dense):  # creating dataset
