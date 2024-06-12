@@ -52,11 +52,12 @@ class Dataloader():
 
     def __iter__(self):
         def return_data(batch):
-            embeddings = [x[0] for x in batch]
+            embeddings = [x[0][0] for x in batch]
             embeddings = torch.vstack(embeddings)
-            labels = [x[1] for x in batch]
+            labels = [x[0][1] for x in batch]
             labels = torch.cat(labels)
-            return embeddings, labels
+            chain_ids = [x[1] for x in batch]
+            return embeddings, labels, chain_ids
 
         batches = []
         if self.shuffle:
@@ -66,7 +67,7 @@ class Dataloader():
         batch = []
 
         for index in index_iterator:
-            batch.append(self.dataset[index])
+            batch.append((self.dataset[index], index))
             if len(batch) == self.batch_size:
                 batches.append(batch)
                 yield return_data(batch)
