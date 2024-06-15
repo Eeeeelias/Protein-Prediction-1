@@ -13,7 +13,9 @@ class Lin_reg(nn.Module):  # model class
         self.device = hparams.get("device", torch.device("cuda:0" if torch.cuda.is_available() else "cpu"))
         self.model = nn.Sequential(
             nn.Linear(self.hparams['input_size'], self.hparams["n_hidden"]),
-            nn.Linear(self.hparams['n_hidden'], 1)
+            nn.Linear(self.hparams['n_hidden'], self.hparams["n_hidden"]),
+            nn.Linear(self.hparams['n_hidden'], self.hparams["n_hidden"]),
+            nn.Linear(self.hparams['n_hidden'], 1),
         )
 
     def forward(self, x):

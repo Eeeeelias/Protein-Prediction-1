@@ -8,10 +8,11 @@ class NeuralNet(nn.Module):  # model class
         self.hparams = hparams
         self.device = hparams.get("device", torch.device("cuda:0" if torch.cuda.is_available() else "cpu"))
         self.model = nn.Sequential(
-            nn.Linear(self.hparams['input_size'], self.hparams["n_hidden"]),
+            nn.Linear(self.hparams['input_size'], 512),
             nn.ReLU(),
-            nn.Linear(self.hparams['n_hidden'], 1),
-            nn.ReLU()
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Linear(256, 1),
         )
 
     def forward(self, x):
