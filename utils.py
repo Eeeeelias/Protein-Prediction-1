@@ -105,15 +105,51 @@ class CNN(nn.Module):
         super(CNN, self).__init__()
         self.hparams = hparams
         self.device = self.hparams['device']
+
+        # Define convolutional layers
         self.conv1 = nn.Conv1d(in_channels=1024, out_channels=512, kernel_size=9, padding=4)
         self.conv2 = nn.Conv1d(in_channels=512, out_channels=256, kernel_size=3, padding=1)
-        self.fc1 = nn.Linear(256, 1)
+        self.conv3 = nn.Conv1d(in_channels=256, out_channels=128, kernel_size=3, padding=1)
+
+        # Define fully connected layer
+        self.fc1 = nn.Linear(128, 1)
+
+        # Define dropout layer for regularization
+        self.dropout = nn.Dropout(p=0.5)
 
     def forward(self, x):
         x = x.permute(0, 2, 1)  # Change shape to (batch_size, 1024, L)
 
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
+        x = F.relu(self.conv3(x))
+
+        # Apply dropout for regularization
+        x = self.dropout(x)
+
+        x = x.permute(0, 2, 1)  # Change shape back to (batch_size, L, 128)
+
+        x = self.fc1(x)
+        return x.squeeze(2)
+
+
+class CNNBatchNorm(nn.Module):
+    def __init__(self, hparams):
+        super(CNNBatchNorm, self).__init__()
+        self.hparams = hparams
+        self.device = self.hparams['device']
+        self.conv1 = nn.Conv1d(in_channels=1024, out_channels=512, kernel_size=5, padding=2)
+        self.bn1 = nn.BatchNorm1d(512)
+        self.relu1 = nn.ReLU(inplace=True)
+        self.conv2 = nn.Conv1d(in_channels=512, out_channels=256, kernel_size=5, padding=2)
+        self.bn2 = nn.BatchNorm1d(256)
+        self.relu2 = nn.ReLU(inplace=True)
+        self.fc1 = nn.Linear(256, 1)
+
+    def forward(self, x):
+        x = x.permute(0, 2, 1)  # Change shape to (batch_size, 1024, L)
+        x = self.relu1(self.bn1(self.conv1(x)))
+        x = self.relu2(self.bn2(self.conv2(x)))
         x = x.permute(0, 2, 1)  # Change shape back to (batch_size, L, 256)
         x = self.fc1(x)
         return x.squeeze(2)
@@ -140,12 +176,15 @@ def train_CNN(train_loader, val_loader, hparams):
 
     optimizer = torch.optim.Adam(model.parameters(), lr=model.hparams['lr'])
     criterion = nn.MSELoss()
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", verbose=True, factor=0.5, min_lr=1e-5,
+                                                           patience=5)
 
     for epoch in range(epochs):
         model.train()  # training model
         running_loss = 0.0
 
-        for inputs, targets, _ in tqdm.tqdm(train_loader, desc=f"Epoch {epoch + 1}/{epochs}", maxinterval=len(train_loader)):
+        for inputs, targets, _ in tqdm.tqdm(train_loader, desc=f"Epoch {epoch + 1}/{epochs}",
+                                            maxinterval=len(train_loader)):
             # send data to device
             inputs, targets = inputs.to(model.device), targets.to(model.device)
             optimizer.zero_grad()
@@ -176,14 +215,23 @@ def train_CNN(train_loader, val_loader, hparams):
                 val_running_loss += val_loss
 
         # remember validation scores
-        losses_val.append(val_running_loss / len(val_loader))
-        tb_logger.add_scalar('Validation loss', val_running_loss / len(val_loader), epoch)
-
         avg_val_loss = val_loss / len(val_loader)
+        losses_val.append(avg_val_loss)
+        tb_logger.add_scalar('Validation loss', avg_val_loss, epoch)
+
         early_stop(avg_val_loss)
+        scheduler.step(metrics=avg_val_loss)
 
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
 
     print(f"Best validation loss: {best_val_loss}")
     return model, losses_train, losses_val, outputs, targets
+
+
+def load_model(model_path, hparams):
+    model = CNN(hparams)
+    model.load_state_dict(torch.load(model_path))
+    model.to(model.device)
+    model.eval()
+    return model
