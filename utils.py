@@ -105,30 +105,16 @@ class CNN(nn.Module):
         super(CNN, self).__init__()
         self.hparams = hparams
         self.device = self.hparams['device']
-
-        # Define convolutional layers
         self.conv1 = nn.Conv1d(in_channels=1024, out_channels=512, kernel_size=9, padding=4)
         self.conv2 = nn.Conv1d(in_channels=512, out_channels=256, kernel_size=3, padding=1)
-        self.conv3 = nn.Conv1d(in_channels=256, out_channels=128, kernel_size=3, padding=1)
-
-        # Define fully connected layer
-        self.fc1 = nn.Linear(128, 1)
-
-        # Define dropout layer for regularization
-        self.dropout = nn.Dropout(p=0.5)
+        self.fc1 = nn.Linear(256, 1)
 
     def forward(self, x):
         x = x.permute(0, 2, 1)  # Change shape to (batch_size, 1024, L)
 
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
-        x = F.relu(self.conv3(x))
-
-        # Apply dropout for regularization
-        x = self.dropout(x)
-
-        x = x.permute(0, 2, 1)  # Change shape back to (batch_size, L, 128)
-
+        x = x.permute(0, 2, 1)  # Change shape back to (batch_size, L, 256)
         x = self.fc1(x)
         return x.squeeze(2)
 
