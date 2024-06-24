@@ -26,8 +26,9 @@ class dense_Dataset:  # dataset class
         if val_perc == 0:
             self.test_keys = self.keys
             return
-        self.train_keys, self.test_keys = train_test_split(self.keys, test_size=test_perc, random_state=42)
-        self.train_keys, self.val_keys = train_test_split(self.train_keys, test_size=val_perc, random_state=0)
+        if test_perc > 0:
+            self.train_keys, self.test_keys = train_test_split(self.keys, test_size=test_perc, random_state=42)
+        self.train_keys, self.val_keys = train_test_split(self.train_keys if test_perc else self.keys, test_size=val_perc, random_state=0)
 
     @staticmethod
     def make_dataset(path_to_dense):  # creating dataset
