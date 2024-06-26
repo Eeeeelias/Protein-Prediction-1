@@ -50,6 +50,43 @@ class dense_Dataset:  # dataset class
                                                                                      dtype=torch.float)
 
 
+class DisorderDataset:  # dataset class
+    def __init__(self, path_to_embed, path_to_dense, test_perc=.15, val_perc=.15):
+        self.dense = self.make_dataset(path_to_dense)
+        self.embed_file = h5py.File(path_to_embed, 'r')
+        # get keys of embed_file
+        self.embed_keys = list(self.embed_file.keys())
+        self.keys = list(set(self.embed_keys) & set(self.dense.keys()))
+        if val_perc == 0:
+            self.test_keys = self.keys
+            return
+        if test_perc > 0:
+            self.train_keys, self.test_keys = train_test_split(self.keys, test_size=test_perc, random_state=42)
+        self.train_keys, self.val_keys = train_test_split(self.train_keys if test_perc else self.keys, test_size=val_perc, random_state=0)
+
+    @staticmethod
+    def make_dataset(path_to_dense):  # creating dataset
+        disorder = pd.read_csv(path_to_dense, sep='\t')
+        # filter for only those with density
+        # Apply the conversion to the 'densities' column
+        for i, row in disorder.iterrows():
+            row_scores = row['pscores'].split(",")
+            for x in range(len(row_scores)):
+                row_scores[x] = float(row_scores[x]) if row_scores[x] != 'NA' else 0.0
+            disorder.at[i, 'pscores'] = row_scores
+        disorder = disorder.set_index('PDBchain')['pscores'].to_dict()
+        return disorder
+
+    def __len__(self):
+        return (len(self.keys))
+
+    def __getitem__(self, index):
+        if isinstance(index, int):
+            index = self.keys[index]
+        return torch.tensor(self.embed_file[index], dtype=torch.float), torch.tensor(self.dense[index],
+                                                                                     dtype=torch.float)
+
+
 class Dataloader():
     def __init__(self, dataset, keys, batch_size=32, shuffle=True):
         self.dataset, self.keys, self.batch_size, self.shuffle = dataset, keys, batch_size, shuffle
