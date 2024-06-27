@@ -105,8 +105,10 @@ class CNN(nn.Module):
         super(CNN, self).__init__()
         self.hparams = hparams
         self.device = self.hparams['device']
-        self.conv1 = nn.Conv1d(in_channels=1024, out_channels=512, kernel_size=9, padding=4)
-        self.conv2 = nn.Conv1d(in_channels=512, out_channels=256, kernel_size=3, padding=1)
+        # for density prediction, we used kernel size 9, padding 4 in conv1
+        # and kernel size 3, padding 1 in conv2
+        self.conv1 = nn.Conv1d(in_channels=1024, out_channels=512, kernel_size=5, padding=2)
+        self.conv2 = nn.Conv1d(in_channels=512, out_channels=256, kernel_size=5, padding=2)
         self.fc1 = nn.Linear(256, 1)
 
     def forward(self, x):
@@ -146,7 +148,7 @@ def train_CNN(train_loader, val_loader, hparams):
     model = CNN(hparams)
     model.to(model.device)
 
-    path = "logs/protpred1_cnn"
+    path = "logs/protpred1_cnn/disorder"
     num_of_runs = len(os.listdir(path)) if os.path.exists(path) else 0
     path = os.path.join(path, f'run_{num_of_runs + 1}')
 

@@ -17,8 +17,9 @@ import pickle
 
 
 class dense_Dataset:  # dataset class
-    def __init__(self, path_to_embed, path_to_dense, test_perc=.15, val_perc=.15):
-        self.dense = self.make_dataset(path_to_dense)
+    def __init__(self, path_to_embed, path_to_dense, test_perc=.15, val_perc=.15, label_col='contact_density',
+                 id_col='PDBchain'):
+        self.dense = self.make_dataset(path_to_dense, label_col, id_col)
         self.embed_file = h5py.File(path_to_embed, 'r')
         # get keys of embed_file
         self.embed_keys = list(self.embed_file.keys())
@@ -31,13 +32,13 @@ class dense_Dataset:  # dataset class
         self.train_keys, self.val_keys = train_test_split(self.train_keys if test_perc else self.keys, test_size=val_perc, random_state=0)
 
     @staticmethod
-    def make_dataset(path_to_dense):  # creating dataset
+    def make_dataset(path_to_dense, label_col='contact_density', id_col='PDBchain'):  # creating dataset
         dense = pd.read_csv(path_to_dense, sep='\t')
         # filter for only those with density
         # Apply the conversion to the 'densities' column
-        dense = dense[~dense['contact_density'].isna()]
-        dense['contact_density'] = dense['contact_density'].apply(ast.literal_eval)
-        dense = dense.set_index('PDBchain')['contact_density'].to_dict()
+        dense = dense[~dense[label_col].isna()]
+        dense[label_col] = dense[label_col].apply(ast.literal_eval)
+        dense = dense.set_index(id_col)[label_col].to_dict()
         return dense
 
     def __len__(self):
