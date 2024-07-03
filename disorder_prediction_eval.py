@@ -1,8 +1,11 @@
 # read in the pkl file with predictions
 import pickle
 import pandas as pd
+import numpy as np
+from sklearn.metrics import mean_squared_error, r2_score, roc_auc_score, f1_score
+import matplotlib.pyplot as plt
 
-predictions = pickle.load(open('trizod_test_set_disorder_predictions_our_final_cnn.pkl', 'rb'))
+predictions = pickle.load(open('trizod_test_set_disorder_cpu_11.pkl', 'rb'))
 
 # read original disorder data
 
@@ -19,6 +22,8 @@ flat_predictions = []
 flat_ids = []
 for batch in predictions['test_preds']:
     for pred in batch:
+        # predictions were sqrted, so square them
+        # pred = [x ** 2 for x in pred]
         flat_predictions.append(pred)
 for key in predictions['test_ids']:
     flat_ids.extend(key)
@@ -43,8 +48,6 @@ for pred, chain, orig in zip(flat_predictions, flat_ids, original_disorder['psco
             raw_truths.append(o)
 
 # calculate mse
-from sklearn.metrics import mean_squared_error, r2_score
-import matplotlib.pyplot as plt
 
 mse = mean_squared_error(raw_truths, raw_predictions)
 print(f'MSE: {mse}')
@@ -52,8 +55,8 @@ r2 = r2_score(raw_truths, raw_predictions)
 print(f'R2: {r2}')
 
 
+raw_truths = np.array(raw_truths)
 
-# pdbchain 4A8XA has 88 residues
 truths = raw_truths[:88]
 preds = raw_predictions[:88]
 mins = [min(truths[i], preds[i]) for i in range(len(truths))]
@@ -70,3 +73,18 @@ plt.ylabel("Contact Density")
 plt.title("Disorder per Residue")
 plt.legend()
 plt.show()
+
+# do histogram of raw truths
+
+# split into two parts: >0.5 in truth is disorder, <0.5 is order, calculate F1 score
+truths = np.array(raw_truths)
+preds = np.array(raw_predictions)
+
+true_classes = (truths > 0.5).astype(int)
+predicted_classes = (preds > 0.5).astype(int)
+
+auc = roc_auc_score(true_classes, preds)
+f1 = f1_score(true_classes, predicted_classes)
+print(f'AUC: {auc}')
+print(f'F1: {f1}')
+print(f"Max: {max(raw_predictions)}, Max true: {max(raw_truths)}")

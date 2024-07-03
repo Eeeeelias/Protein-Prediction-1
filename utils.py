@@ -7,6 +7,15 @@ import torch.nn.functional as F
 import os
 import tqdm
 from torch.utils.tensorboard import SummaryWriter
+import random
+
+seed = 42
+random.seed(seed)
+os.environ['PYTHONHASHSEED'] = str(seed)
+np.random.seed(seed)
+torch.manual_seed(seed)
+torch.cuda.manual_seed_all(seed)
+torch.backends.cudnn.deterministic = True
 
 
 # custom early stopping, based on chosen metric, works for minimizing metrics
@@ -65,6 +74,7 @@ class CNN_Dataloader():
         for embed, dense in zip(embeddings, densities):
             pad_embed = F.pad(embed, (0, 0, 0, max_len - embed.shape[0]), 'constant', 0)
             padded_embeddings.append(pad_embed)
+            dense = torch.sqrt(dense)
             pad_dense = F.pad(dense, (0, max_len - dense.shape[0]), 'constant', 0)
             padded_densities.append(pad_dense)
         return torch.stack(padded_embeddings), torch.stack(padded_densities), keys
@@ -107,8 +117,8 @@ class CNN(nn.Module):
         self.device = self.hparams['device']
         # for density prediction, we used kernel size 9, padding 4 in conv1
         # and kernel size 3, padding 1 in conv2
-        self.conv1 = nn.Conv1d(in_channels=1024, out_channels=512, kernel_size=5, padding=2)
-        self.conv2 = nn.Conv1d(in_channels=512, out_channels=256, kernel_size=5, padding=2)
+        self.conv1 = nn.Conv1d(in_channels=1024, out_channels=512, kernel_size=9, padding=4)
+        self.conv2 = nn.Conv1d(in_channels=512, out_channels=256, kernel_size=3, padding=1)
         self.fc1 = nn.Linear(256, 1)
 
     def forward(self, x):
@@ -143,12 +153,15 @@ class CNNBatchNorm(nn.Module):
         return x.squeeze(2)
 
 
-def train_CNN(train_loader, val_loader, hparams):
+def train_CNN(train_loader, val_loader, hparams, train_preds=False):
     # actual training
     model = CNN(hparams)
+    # print number of trainable parameters
+    print(f"Number of trainable parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
+
     model.to(model.device)
 
-    path = "logs/protpred1_cnn/disorder"
+    path = "logs/protpred1_cnn/disorder/final_tries/"
     num_of_runs = len(os.listdir(path)) if os.path.exists(path) else 0
     path = os.path.join(path, f'run_{num_of_runs + 1}')
 
@@ -164,9 +177,13 @@ def train_CNN(train_loader, val_loader, hparams):
 
     optimizer = torch.optim.Adam(model.parameters(), lr=model.hparams['lr'])
     criterion = nn.MSELoss()
+    criterion.to(model.device)
+
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", verbose=True, factor=0.5, min_lr=1e-5,
                                                            patience=5)
 
+    final_train_out = None
+    final_pred_out = None
     for epoch in range(epochs):
         model.train()  # training model
         running_loss = 0.0
@@ -186,6 +203,9 @@ def train_CNN(train_loader, val_loader, hparams):
             optimizer.step()
 
             running_loss += loss.item()
+
+            final_train_out = outputs
+            final_pred_out = targets
         losses_train.append(running_loss / len(train_loader))
         tb_logger.add_scalar('Training loss', running_loss / len(train_loader), epoch)
 
@@ -214,6 +234,8 @@ def train_CNN(train_loader, val_loader, hparams):
             best_val_loss = avg_val_loss
 
     print(f"Best validation loss: {best_val_loss}")
+    if train_preds:
+        return model, losses_train, losses_val, final_train_out, final_pred_out
     return model, losses_train, losses_val, outputs, targets
 
 

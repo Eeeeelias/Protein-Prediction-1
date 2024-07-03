@@ -2,9 +2,11 @@ import ast
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from sklearn.metrics import mean_squared_error, r2_score, roc_auc_score, f1_score
+
 
 outputs = {}
-with open('data/udonpred_extended_predicted_all.caid', 'r') as f:
+with open('data/udonpred_original_all.caid', 'r') as f:
     current_chain = []
     current_id = ''
     for line in f.readlines():
@@ -66,3 +68,14 @@ plt.ylabel("Disorder")
 plt.title("Disorder per Residue")
 plt.legend()
 plt.show()
+
+truths = np.array(flat_pscores)
+preds = np.array(flat_outputs)
+
+true_classes = (truths > 0.5).astype(int)
+predicted_classes = (preds > 0.5).astype(int)
+
+auc = roc_auc_score(true_classes, preds)
+f1 = f1_score(true_classes, predicted_classes)
+print(f'AUC: {auc}')
+print(f'F1: {f1}')
